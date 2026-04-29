@@ -62,8 +62,9 @@ To turn this prototype into a real product, the next steps are: tighter mechanic
 
 ### Project Links
 
-- **Node-RED dashboard (Azure):**
-- **Altium 365 PCBA share link: https://upenn-eselabs.365.altium.com/designs/E257A941-13C5-4D36-81FD-153506AD2CFA#design**
+- **Embedded C Firmware (Si91x):** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code_final
+- **Node-RED Dashboard & Flow Export:** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code_final/final_medication/Node_RED
+- **Altium 365 PCBA share link:** https://upenn-eselabs.365.altium.com/designs/E257A941-13C5-4D36-81FD-153506AD2CFA#design
 
 ---
 
@@ -179,6 +180,6 @@ To turn this prototype into a real product, the next steps are: tighter mechanic
 
 Per the assignment, source code is **not** committed to this repo — only links.
 
-- **Embedded C firmware (Si91x):**
-- **Node-RED dashboard / flow export:**
+- **Embedded C firmware (Si91x): https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code_final **
+- **Node-RED dashboard / flow export: https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code_final/final_medication/Node_RED**
 - **Other software / scripts:**
