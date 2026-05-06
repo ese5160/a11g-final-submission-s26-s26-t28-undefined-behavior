@@ -157,7 +157,7 @@ The tables below review the original hardware and software requirements against 
 ![PCBA top](image/README/PCBA_top.png)
 ![PCBA bottom](image/README/PCBA_bottom.png)
 
-![Thermal image under load](image/README/thermal.jpg)
+![Thermal image under load](image/README/thermal_under_load.jpg)
 
 ![Altium 2D board view](image/README/Altium_2D.png)
 ![Altium 3D board view](image/README/Altium_3D.png)
@@ -173,8 +173,8 @@ The tables below review the original hardware and software requirements against 
 
 ## 5. Codebase
 
-- **Embedded C Firmware:** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/code_final
-- **Node-RED dashboard code:** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/code_final/final_medication/Node_RED
+- **Embedded C Firmware:** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code/final
+- **Node-RED dashboard code:** https://github.com/ese5160/final-project-firmware-s26-t28-undefined-behavior/tree/main/code/final/final_medication/Node_RED
 
 
 ---
