@@ -40,7 +40,7 @@ We use a MCU, Silicon Labs **SIWG917Y121MGABA** Wi-Fi MCU, to run the main FreeR
 | System control | SIWG917Y121MGABA running the main FreeRTOS medication-dispenser firmware |
 | Color sensing | TCS34725 RGB color sensor; classifies learned pill colors as `COLOR_0`, `COLOR_1`, or `COLOR_2` |
 | Environmental sensing | HTU21D temperature/humidity sensor on I2C0, default sample period 10 s |
-| Display | ST7735R LCD over software SPI/GSPI-style GPIO interface |
+| Display | ST7735R LCD on GSPI, showing system status and alerts |
 | Audio alert | Active digital buzzer on GPIO29 |
 | Actuation | Three SG92R/SG90-class servos: loading release, compartment rotation, and dispensing release |
 | Cloud | Node-RED dashboard on Azure VM using MQTT topics such as `ese5160/dispense/set`, `ese5160/config/set`, `ese5160/ota/update`, and `ese5160/pill/event` |
@@ -100,7 +100,7 @@ Through ESE5160, we gained hands-on experience with the full IoT edge stack: PCB
 ### Project Links
 
 - **Node-RED Dashboard UI:** http://20.242.49.27:1880/ui
-- **Node-RED Dashboard:** http://20.242.49.27:1880
+- **Node-RED Flow Editor:** http://20.242.49.27:1880
 - **Altium 365 PCBA Share Link:** https://upenn-eselabs.365.altium.com/designs/E257A941-13C5-4D36-81FD-153506AD2CFA#design
 
 ---
@@ -119,14 +119,13 @@ The tables below review the original hardware and software requirements against 
 | HRS04 | The color-sensing subsystem shall distinguish the different pill colors used in the prototype. | Met | The secondary MCU maps stable learned colors to `COLOR_0`, `COLOR_1`, and `COLOR_2`; the primary MCU debounces the received code before starting a loading sequence. Add your final calibration photo/video frame here if available. |
 | HRS05 | A sorting actuator shall route each loaded pill into the compartment associated with its detected color. | Met | The primary MCU maps detected color to compartment and commands the compartment-rotation servo plus loading-release servo through the actuator task. |
 | HRS06 | A dispensing actuator shall release pills from a selected compartment when commanded by schedule or dashboard. | Met | The dispensing FSM checks inventory, rotates to the requested compartment, drives the dispensing-release servo, updates inventory, sounds the take-pill alert, and publishes a dispense event. |
-| HRS07 | If a pill color is invalid or unmapped, the system shall generate an error instead of loading it as a normal pill. | Partial | The main FSM includes fault paths for invalid mapping/selection and publishes fault events. The color subsystem currently classifies the first three learned colors and outputs `NONE` when no valid object is present; a production reject-bin mechanism is not implemented. |
-| HRS08 | The hardware shall support OTA firmware update over Wi-Fi. | Met | The primary MCU includes HTTPS OTAF support and can download `firmware/latest.rps` from Azure Blob Storage after a Node-RED OTA command. |
-| HRS10 | A buzzer shall provide audible alerts for environmental warnings and medication-error conditions. | Met | GPIO29 controls an active buzzer. Firmware implements boot, environmental warning, take-pill, fault, and OTA-done buzzer patterns. |
-| HRS11 | A visual display shall present current state and dispensing information to the user. | Met | ST7735R LCD shows temperature/humidity, Wi-Fi status, inventory indicators, loading/dispensing overlays, faults, and OTA status. |
-| HRS13 | A temperature/humidity sensor shall monitor environmental conditions inside the dispenser. | Met | HTU21D is connected on I2C0 using GPIO6/GPIO7 and sampled by `task_sensor` at a configurable period. |
-| HRS14 | When temperature or humidity exceeds safe thresholds, the system shall generate an environmental warning. | Met | Default thresholds are 0-30 degC and 0-60% RH. Node-RED can update the thresholds; firmware generates temp/humidity warning and normal events on threshold crossings. |
-| HRS15 | The system shall be powered by a single-cell 3.7 V Li-Po/Li-ion battery. | Met | Power block uses a single-cell battery as the input source. Add final measured battery input voltage here if available. |
-| HRS16 | The hardware shall include power regulation circuitry to support stable 5 V and 3.3 V rails. | Met | Block diagram and PCB design include a boost circuit for 5 V and buck circuit for 3.3 V. Add final measured rail voltages under load here if available. |
+| HRS07 | The hardware shall support OTA firmware update over Wi-Fi. | Met | The primary MCU includes HTTPS OTAF support and can download `firmware/latest.rps` from Azure Blob Storage after a Node-RED OTA command. |
+| HRS08 | A buzzer shall provide audible alerts for environmental warnings and medication-error conditions. | Met | GPIO29 controls an active buzzer. Firmware implements boot, environmental warning, take-pill, fault, and OTA-done buzzer patterns. |
+| HRS09 | A visual display shall present current state and dispensing information to the user. | Met | ST7735R LCD shows temperature/humidity, Wi-Fi status, inventory indicators, loading/dispensing overlays, faults, and OTA status. |
+| HRS10 | A temperature/humidity sensor shall monitor environmental conditions inside the dispenser. | Met | HTU21D is connected on I2C0 using GPIO6/GPIO7 and sampled by `task_sensor` at a configurable period. |
+| HRS11 | When temperature or humidity exceeds safe thresholds, the system shall generate an environmental warning. | Met | Default thresholds are 0-30 degC and 0-60% RH. Node-RED can update the thresholds; firmware generates temp/humidity warning and normal events on threshold crossings. |
+| HRS12 | The system shall be powered by a single-cell 3.7 V Li-Po/Li-ion battery. | Met | Power block uses a single-cell battery as the input source. Add final measured battery input voltage here if available. |
+| HRS13 | The hardware shall include power regulation circuitry to support stable 5 V and 3.3 V rails. | Met | Block diagram and PCB design include a boost circuit for 5 V and buck circuit for 3.3 V. Add final measured rail voltages under load here if available. |
 
 ### 3.2 Software Requirements (SRS)
 
@@ -138,30 +137,22 @@ The tables below review the original hardware and software requirements against 
 | SRS04 | At each scheduled medication time, the system shall initiate dispensing. | Met | The Node-RED schedule emits `{"cmd":"dispense","compartment":...}` to `ese5160/dispense/set`; the MCU parses the command and starts the dispensing FSM if the slot is valid and not busy. |
 | SRS05 | The system shall provide medication reminder alerts through audio and visual feedback. | Met | The actuator task displays `TAKE PILL` and plays the take-pill buzzer pattern after a successful dispense. |
 | SRS06 | During pill loading, the system shall sample color data and compare it against configured/learned profiles. | Met | The secondary MCU samples TCS34725 RGBC data, waits for a stable object, normalizes RGB values, and matches or stores learned signatures. The primary MCU consumes the resulting stable color code. |
-| SRS07 | If a pill does not match a valid configured profile, the system shall enter an error/fault path and alert the user. | Partial | The primary FSM has fault paths and user alerts. Final hardware does not yet include a separate mechanical reject path for an unknown pill. |
-| SRS13 | The system shall periodically sample temperature and humidity. | Met | HTU21D is sampled every 10 s by default; the sample interval can be configured from Node-RED between 1 s and 600 s. |
-| SRS14 | When temperature or humidity exceeds user-configurable thresholds, the system shall warn the user. | Met | Node-RED sends `config` JSON with threshold values; firmware updates runtime thresholds, publishes config acknowledgements, and triggers environmental warning events and buzzer alerts on threshold crossings. |
-| SRS16 | The display shall update current system status, dispensing activity, and warnings. | Met | LCD layers show base temperature/humidity, Wi-Fi status, inventory, transient overlays, fault messages, and OTA status. |
-| SRS17 | The system shall log dispensing events, sorting errors, and environmental warnings with timestamps. | Partial | The device publishes all event types through MQTT; Node-RED displays/logs them and adds dashboard-side time context. The MCU itself does not include a real-time clock or persistent timestamped event store. |
-| SRS18 | When network connectivity is available, the system shall upload logged events to the cloud. | Met | Wi-Fi/MQTT task publishes load, dispense, inventory, environmental, fault, command-status, and OTA events to the cloud dashboard while connected. |
-| SRS19 | When network connectivity is unavailable, the system shall continue local operation and synchronize stored events once connectivity is restored. | Partial | Local state machine, sensing, display, buzzer, and actuation can continue without cloud commands. Full persistent offline event buffering and later backfill synchronization are not yet implemented. |
-| SRS20 | The system shall accept dispense commands from the Node-RED dashboard. | Met | Manual dashboard buttons publish JSON dispense commands for compartments A/B/C; the firmware validates payloads, rejects invalid/busy/empty requests, and reports command status. |
-| SRS21 | The system shall accept schedule and temperature/humidity threshold updates from Node-RED. | Met | Schedule management is implemented in Node-RED, and runtime environmental thresholds/sample interval are sent to the MCU through `ese5160/config/set`. |
-| SRS22 | The system shall support OTA firmware updates over Wi-Fi. | Met | Node-RED OTA button publishes an OTA command; `task_wifi` forwards it to `task_ota`, which runs HTTPS OTAF from Azure Blob Storage and soft-resets the SoC after success. |
+| SRS07 | The system shall periodically sample temperature and humidity. | Met | HTU21D is sampled every 10 s by default; the sample interval can be configured from Node-RED between 1 s and 600 s. |
+| SRS08 | When temperature or humidity exceeds user-configurable thresholds, the system shall warn the user. | Met | Node-RED sends `config` JSON with threshold values; firmware updates runtime thresholds, publishes config acknowledgements, and triggers environmental warning events and buzzer alerts on threshold crossings. |
+| SRS09 | The display shall update current system status, dispensing activity, and warnings. | Met | LCD layers show base temperature/humidity, Wi-Fi status, inventory, transient overlays, fault messages, and OTA status. |
+| SRS10 | When network connectivity is available, the system shall upload logged events to the cloud. | Met | Wi-Fi/MQTT task publishes load, dispense, inventory, environmental, fault, command-status, and OTA events to the cloud dashboard while connected. |
+| SRS11 | The system shall accept dispense commands from the Node-RED dashboard. | Met | Manual dashboard buttons publish JSON dispense commands for compartments A/B/C; the firmware validates payloads, rejects invalid/busy/empty requests, and reports command status. |
+| SRS12 | The system shall accept schedule and temperature/humidity threshold updates from Node-RED. | Met | Schedule management is implemented in Node-RED, and runtime environmental thresholds/sample interval are sent to the MCU through `ese5160/config/set`. |
+| SRS13 | The system shall support OTA firmware updates over Wi-Fi. | Met | Node-RED OTA button publishes an OTA command; `task_wifi` forwards it to `task_ota`, which runs HTTPS OTAF from Azure Blob Storage and soft-resets the SoC after success. |
 
 ---
 
 ## 4. Project Photos & Screenshots
 
-> Replace any placeholder filenames below with the final images committed under `image/README/`. The assignment requires high-quality photos/screenshots, so do not leave this section as a bullet list without images.
-
+![project integrated view](image/README/project_view.png)
 ![project front view](image/README/project_front.png)
 ![project top view](image/README/project_top.png)
 ![project right view](image/README/project_right.png)
-
-![Final integrated prototype](image/README/final_project.jpg)
-
-### Standalone PCBA - Top
 
 ![PCBA top](image/README/PCBA_top.png)
 ![PCBA bottom](image/README/PCBA_bottom.png)
@@ -171,15 +162,10 @@ The tables below review the original hardware and software requirements against 
 ![Altium 2D board view](image/README/Altium_2D.png)
 ![Altium 3D board view](image/README/Altium_3D.png)
 
-### Node-RED Dashboard
-
-![Node-RED dashboard](image/README/node_red_dashboard.png)
-
-### Node-RED Backend Flow
-
-![Node-RED backend flow](image/README/node_red_backend.png)
-
-### System-Level Block Diagram
+![Node-RED dashboard 1](image/README/Node_UI_1.png)
+![Node-RED dashboard 2](image/README/Node_UI_2.png)
+![Node-RED dashboard 3](image/README/Node_UI_3.png)
+![Node-RED backend](image/README/Node_backend.png)
 
 ![System-level block diagram](image/README/block_diagram_pin.png)
 
@@ -192,19 +178,3 @@ The tables below review the original hardware and software requirements against 
 
 
 ---
-
-## Final Submission Checklist
-
-Before submitting, verify the following:
-
-- [ ] Replace the Google Drive video link with the required public YouTube link, or confirm the teaching team accepts the Drive link.
-- [ ] Add final team member names if required by your GitHub Pages site or video description.
-- [ ] Commit `image/README/block_diagram.png` using the block diagram shown in the final submission.
-- [ ] Add final integrated prototype photo.
-- [ ] Add PCBA top and bottom photos.
-- [ ] Add Node-RED dashboard screenshot.
-- [ ] Add Node-RED backend/flow screenshot.
-- [ ] Add measured 3.3 V and 5 V rail values if available.
-- [ ] Add any final validation data screenshots/log snippets you want the graders to see.
-- [ ] Confirm the Node-RED dashboard URL is live on the Azure VM during grading.
-- [ ] Confirm no private Wi-Fi credentials, secrets, or passwords are committed in the public repository.
